@@ -1,0 +1,63 @@
+# Tests, then builds the six release files reproducibly. Only GitHub's own actions, pinned to commit SHAs. No secrets.
+# Signing: the files are unsigned for now.
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version string to build in, e.g. v0.1.0 (a release candidate build; the tag build of the same commit gives the same bytes)'
+        required: false
+        default: ''
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: gofmt -l . | tee /dev/stderr | (! read)
+      - run: go vet ./...
+      - run: go test ./...
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build twice and compare (reproducible, -trimpath, no build ID, no VCS stamp)
+        run: |
+          V="${{ inputs.version || github.ref_name }}"; V="${V//\//-}"
+          ./build.sh "$V" > /dev/null && cp dist/SHA256SUMS first.sums
+          ./build.sh "$V" && diff first.sums dist/SHA256SUMS && echo "identical on the second build"
+      - name: Check the file types (Windows = MZ, Linux = ELF, macOS = Mach-O) and that all six differ
+        run: |
+          cd dist
+          for f in fileion-windows-*.exe; do [ "$(head -c2 "$f")" = MZ ] || { echo "$f is not a Windows program"; exit 1; }; done
+          for f in fileion-linux-amd64 fileion-linux-arm64; do [ "$(head -c4 "$f" | tail -c3)" = ELF ] || { echo "$f is not a Linux program"; exit 1; }; done
+          for f in fileion-darwin-amd64 fileion-darwin-arm64; do [ "$(od -An -tx1 -N4 "$f" | tr -d ' \n')" = cffaedfe ] || { echo "$f is not a macOS program"; exit 1; }; done
+          [ "$(ls fileion-* | wc -l)" = 6 ]
+          [ -z "$(sha256sum fileion-* | cut -d' ' -f1 | sort | uniq -d)" ]
+          echo "six different files of the right types"
+      - name: The Linux file runs
+        run: ./dist/fileion-linux-amd64 version
+      - uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: fileion-cli
+          path: dist/
