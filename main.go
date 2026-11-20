@@ -43,6 +43,7 @@ type env struct {
 	stdin          io.Reader
 	stdout, stderr io.Writer
 	getenv         func(string) string
+	json           bool // --json appears in the arguments (set by run, so usage errors can answer in JSON)
 }
 
 type opts struct {
@@ -58,13 +59,18 @@ func (s *strList) String() string     { return strings.Join(*s, ",") }
 func (s *strList) Set(v string) error { *s = append(*s, v); return nil }
 
 func main() {
-	os.Exit(run(os.Args[1:], env{os.Stdin, os.Stdout, os.Stderr, os.Getenv}))
+	os.Exit(run(os.Args[1:], env{os.Stdin, os.Stdout, os.Stderr, os.Getenv, false}))
 }
 
 func run(args []string, e env) int {
 	if len(args) == 0 {
 		fmt.Fprint(e.stderr, usageText)
 		return exitUsage
+	}
+	for _, a := range args {
+		if a == "--json" || a == "-json" {
+			e.json = true
+		}
 	}
 	cmd := args[0]
 	switch cmd {
@@ -137,6 +143,9 @@ func parse(cmd string, args []string, e env) (*opts, []string, error) {
 
 func usageErr(e env, msg string) int {
 	fmt.Fprintf(e.stderr, "fileion: %s\nTry: fileion help\n", msg)
+	if e.json {
+		printJSON(e, &opts{}, map[string]any{"error": map[string]any{"code": "usage", "message": msg, "request_id": ""}})
+	}
 	return exitUsage
 }
 
@@ -365,11 +374,40 @@ type fileRes struct {
 	} `json:"file"`
 	Trust *struct {
 		OK    int
-		Steps []struct{ Status string }
+		Steps json.RawMessage
 	} `json:"trust"`
 }
 
-var stepNames = []string{"Official source", "Fingerprint", "VirusTotal", "Code signature", "Installer test"}
+var (
+	stepNames = []string{"Official source", "Fingerprint", "VirusTotal", "Code signature", "Installer test"}
+	stepKeys  = []string{"source", "fingerprint", "virustotal", "signature", "installer"}
+)
+
+// stepStatuses lists the trust steps' statuses in order. The API sends steps as an object keyed by check name
+// (source, fingerprint, virustotal, signature, installer); a plain list is read too.
+func stepStatuses(raw json.RawMessage) []string {
+	type st struct{ Status string }
+	var byKey map[string]st
+	if json.Unmarshal(raw, &byKey) == nil && len(byKey) > 0 {
+		var out []string
+		for _, k := range stepKeys {
+			if s, ok := byKey[k]; ok {
+				out = append(out, s.Status)
+			}
+		}
+		if len(out) == len(byKey) {
+			return out
+		}
+		return nil
+	}
+	var list []st
+	json.Unmarshal(raw, &list)
+	out := make([]string, len(list))
+	for i, s := range list {
+		out[i] = s.Status
+	}
+	return out
+}
 
 func renderFile(e env, o *opts, label, hash string, r fileRes) {
 	out(e, o, "%s\n", label)
@@ -402,15 +440,15 @@ func renderFile(e env, o *opts, label, hash string, r fileRes) {
 		}
 	}
 	if t := r.Trust; t != nil {
-		s := fmt.Sprintf("%d of %d checks", t.OK, len(t.Steps))
+		steps := stepStatuses(t.Steps)
+		s := fmt.Sprintf("%d of %d checks", t.OK, len(steps))
 		if r.Software != nil && r.Software.URL != "" {
 			s += "   " + r.Software.URL
 		}
 		row("fileion", s)
-		if len(t.Steps) == len(stepNames) {
+		if len(steps) == len(stepNames) {
 			var parts []string
-			for i, st := range t.Steps {
-				status := st.Status
+			for i, status := range steps {
 				if status == "na" {
 					status = "not checked"
 				}
@@ -431,12 +469,19 @@ func cleanItem(raw json.RawMessage, path string) map[string]any {
 		for _, k := range []string{"label", "state", "chip"} {
 			delete(t, k)
 		}
-		if steps, ok := t["steps"].([]any); ok {
-			for _, s := range steps {
-				if sm, ok := s.(map[string]any); ok {
-					if txt, ok := sm["text"].(string); ok {
-						sm["text"] = strings.ReplaceAll(txt, "Clean installer", "Installer test")
-					}
+		var steps []any
+		switch v := t["steps"].(type) {
+		case []any:
+			steps = v
+		case map[string]any:
+			for _, s := range v {
+				steps = append(steps, s)
+			}
+		}
+		for _, s := range steps {
+			if sm, ok := s.(map[string]any); ok {
+				if txt, ok := sm["text"].(string); ok {
+					sm["text"] = strings.ReplaceAll(txt, "Clean installer", "Installer test")
 				}
 			}
 		}

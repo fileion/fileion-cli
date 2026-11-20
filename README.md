@@ -16,7 +16,7 @@ fileion latest <slug> [-p os]    the newest version per platform; with -p only t
 fileion version | help
 ```
 
-Options: `--json` (JSON on stdout, errors too), `-q/--quiet` (no output, exit code only), `--key` or env `FILEION_API_KEY` (optional free key for higher limits; prefer the env var, a flag shows in process lists), `--max-wait <seconds>` (default 30), `--allow-unknown` (`check` exits 0 even when some hashes are unknown).
+Options: `--json` (JSON on stdout, errors too: a usage error is also answered as `{"error":{"code":"usage",…}}` whenever `--json` appears among the arguments), `-q/--quiet` (no output, exit code only), `--key` or env `FILEION_API_KEY` (optional free key for higher limits; prefer the env var, a flag shows in process lists), `--max-wait <seconds>` (default 30), `--allow-unknown` (`check` exits 0 even when some hashes are unknown).
 
 ```
 $ fileion check installer.exe

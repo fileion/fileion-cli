@@ -59,7 +59,7 @@ func do(t *testing.T, f *fake, stdin string, envKey string, args ...string) (int
 			return envKey
 		}
 		return ""
-	}}
+	}, false}
 	if f != nil {
 		args = append(args, "--api-url", f.srv.URL)
 	}
@@ -74,7 +74,7 @@ func tmpFile(t *testing.T, content string) string {
 }
 
 func foundItem(hash string) string {
-	return `{"found":true,"hash":"` + hash + `","software":{"slug":"vlc","name":"VLC media player","url":"https://vlc.fileion.com"},"version":{"id":1,"version":"3.0.21","released_at":"2026-10-30","platform":"windows"},"file":{"source":{"kind":"official","host":"get.videolan.org"},"scan":{"engines":70,"flagged":0,"scanned_at":"2026-11-02","report_url":"https://vt.example/r"}},"trust":{"state":"verified","label":"Fileion Verified","ok":5,"steps":[{"status":"ok","text":"Official source"},{"status":"ok","text":"Fingerprint"},{"status":"ok","text":"VirusTotal"},{"status":"ok","text":"Code signature"},{"status":"na","text":"Clean installer"}]}}`
+	return `{"found":true,"hash":"` + hash + `","software":{"slug":"vlc","name":"VLC media player","url":"https://vlc.fileion.com"},"version":{"id":1,"version":"3.0.21","released_at":"2026-10-30","platform":"windows"},"file":{"source":{"kind":"official","host":"get.videolan.org"},"scan":{"engines":70,"flagged":0,"scanned_at":"2026-11-02","report_url":"https://vt.example/r"}},"trust":{"state":"verified","label":"Fileion Verified","ok":4,"steps":{"source":{"status":"ok","text":"Official source"},"fingerprint":{"status":"ok","text":"Fingerprint"},"virustotal":{"status":"ok","text":"VirusTotal"},"signature":{"status":"ok","text":"Code signature"},"installer":{"status":"na","text":"Clean installer"}}}}`
 }
 
 func TestHashVectors(t *testing.T) {
@@ -114,7 +114,7 @@ func TestCheckFoundAndUnknown(t *testing.T) {
 		}
 	})
 	code, so, _ := do(t, f, "", "", "check", tmpFile(t, "a"), "--api-url", f.srv.URL)
-	if code != 0 || !strings.Contains(so, "listed      yes") || !strings.Contains(so, "VLC media player (vlc)") || !strings.Contains(so, "0 of 70 engines flagged, scanned 2026-11-02 (report: https://vt.example/r)") || !strings.Contains(so, "5 of 5 checks   https://vlc.fileion.com") || !strings.Contains(so, "Installer test not checked") {
+	if code != 0 || !strings.Contains(so, "listed      yes") || !strings.Contains(so, "VLC media player (vlc)") || !strings.Contains(so, "0 of 70 engines flagged, scanned 2026-11-02 (report: https://vt.example/r)") || !strings.Contains(so, "4 of 5 checks   https://vlc.fileion.com") || !strings.Contains(so, "Installer test not checked") {
 		t.Fatalf("found: %d\n%s", code, so)
 	}
 	code, so, _ = do(t, f, "", "", "check", tmpFile(t, ""))
@@ -173,7 +173,7 @@ func TestCheckJSONMixedBatchAndStdin(t *testing.T) {
 	if arr[0]["found"] != true || arr[0]["path"] != p || arr[1]["error"] == nil || arr[2]["found"] != false {
 		t.Fatalf("order or fields: %s", so)
 	}
-	if tr := arr[0]["trust"].(map[string]any); tr["label"] != nil || tr["state"] != nil || tr["ok"] != float64(5) {
+	if tr := arr[0]["trust"].(map[string]any); tr["label"] != nil || tr["state"] != nil || tr["ok"] != float64(4) {
 		t.Fatal("trust not trimmed", tr)
 	}
 	if !strings.Contains(so, "Installer test") || strings.Contains(so, "Clean installer") {
@@ -350,5 +350,28 @@ func TestHelpVersionQuiet(t *testing.T) {
 	f := newFake(t, func(w http.ResponseWriter, r *http.Request) { reply(w, 200, `{"data":{"slug":"v","name":"V"}}`) })
 	if code, so, se := do(t, f, "", "", "info", "v", "-q"); code != 0 || so != "" || se != "" {
 		t.Fatal("quiet")
+	}
+}
+
+func TestUsageErrorsAnswerInJSONWithJSONFlag(t *testing.T) {
+	for _, args := range [][]string{{"check", "--json"}, {"info", "--json"}, {"nope", "--json"}, {"latest", "vlc", "--bogus", "--json"}} {
+		code, so, se := do(t, nil, "", "", args...)
+		var d struct {
+			Error struct{ Code, Message string }
+		}
+		if code != 2 || json.Unmarshal([]byte(so), &d) != nil || d.Error.Code != "usage" || d.Error.Message == "" || se == "" {
+			t.Errorf("%v: %d %q %q", args, code, so, se)
+		}
+	}
+	if _, so, _ := do(t, nil, "", "", "check"); so != "" {
+		t.Error("no JSON without --json")
+	}
+}
+
+func TestStepsAsListStillCounted(t *testing.T) {
+	list := `{"found":true,"hash":"` + hA + `","trust":{"ok":2,"steps":[{"status":"ok"},{"status":"ok"},{"status":"warn"},{"status":"na"},{"status":"na"}]}}`
+	f := newFake(t, func(w http.ResponseWriter, r *http.Request) { reply(w, 200, `{"data":`+list+`}`) })
+	if _, so, _ := do(t, f, "a", "", "check", "-"); !strings.Contains(so, "2 of 5 checks") {
+		t.Fatal(so)
 	}
 }
