@@ -21,11 +21,11 @@ Options: `--json` (JSON on stdout, errors too: a usage error is also answered as
 ```
 $ fileion check installer.exe
 installer.exe
-  listed      yes
+  listed      yes, this build
   software    VLC media player (vlc)
   version     3.0.21, windows
   source      official (get.videolan.org)
-  virustotal  0 of 70 engines flagged, scanned 2026-11-02 (report: https://www.virustotal.com/…)
+  virustotal  0 of 70 engines flagged this build, scanned 2026-11-02 (report: https://www.virustotal.com/…)
   fileion     5 of 5 checks   https://vlc.fileion.com
   checks      Official source ok, Fingerprint ok, VirusTotal ok, Code signature ok, Installer test ok
   sha256      9f2c…e41a
@@ -34,7 +34,7 @@ $ V=$(fileion latest vlc -p windows)    # 3.0.21
 $ fileion check build/*.zip --json      # for CI: one request for up to 100 files
 ```
 
-`check` reports what Fileion lists: a known file, its source, version and the numbers behind it. "Not listed" means Fileion has no record of that file; it is not a warning and not a verdict, and a listed file is not a promise about it either.
+`check` is about the one file you give it (one build of a title): it reports what Fileion lists for that build, its source, version and the numbers behind it. "Not listed" means Fileion has no record of that file; it is not a warning and not a verdict, and a listed file is not a promise about it either.
 
 ### Exit codes
 

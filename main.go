@@ -413,11 +413,11 @@ func renderFile(e env, o *opts, label, hash string, r fileRes) {
 	out(e, o, "%s\n", label)
 	row := func(k, v string) { out(e, o, "  %-12s%s\n", k, v) }
 	if !r.Found {
-		row("listed", "no. Fileion has no record of this file (this is not a warning)")
+		row("listed", "no. Fileion has no record of this build (this is not a warning)")
 		row("sha256", hash)
 		return
 	}
-	row("listed", "yes")
+	row("listed", "yes, this build")
 	if s := r.Software; s != nil {
 		row("software", fmt.Sprintf("%s (%s)", s.Name, s.Slug))
 	}
@@ -429,7 +429,7 @@ func renderFile(e env, o *opts, label, hash string, r fileRes) {
 			row("source", fmt.Sprintf("%s (%s)", f.Source.Kind, f.Source.Host))
 		}
 		if sc := f.Scan; sc != nil {
-			s := fmt.Sprintf("%d of %d engines flagged", sc.Flagged, sc.Engines)
+			s := fmt.Sprintf("%d of %d engines flagged this build", sc.Flagged, sc.Engines)
 			if sc.ScannedAt != nil {
 				s += ", scanned " + *sc.ScannedAt
 			}

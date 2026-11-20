@@ -114,11 +114,11 @@ func TestCheckFoundAndUnknown(t *testing.T) {
 		}
 	})
 	code, so, _ := do(t, f, "", "", "check", tmpFile(t, "a"), "--api-url", f.srv.URL)
-	if code != 0 || !strings.Contains(so, "listed      yes") || !strings.Contains(so, "VLC media player (vlc)") || !strings.Contains(so, "0 of 70 engines flagged, scanned 2026-11-02 (report: https://vt.example/r)") || !strings.Contains(so, "4 of 5 checks   https://vlc.fileion.com") || !strings.Contains(so, "Installer test not checked") {
+	if code != 0 || !strings.Contains(so, "listed      yes, this build") || !strings.Contains(so, "VLC media player (vlc)") || !strings.Contains(so, "0 of 70 engines flagged this build, scanned 2026-11-02 (report: https://vt.example/r)") || !strings.Contains(so, "4 of 5 checks   https://vlc.fileion.com") || !strings.Contains(so, "Installer test not checked") {
 		t.Fatalf("found: %d\n%s", code, so)
 	}
 	code, so, _ = do(t, f, "", "", "check", tmpFile(t, ""))
-	if code != 1 || !strings.Contains(so, "listed      no. Fileion has no record of this file (this is not a warning)") {
+	if code != 1 || !strings.Contains(so, "listed      no. Fileion has no record of this build (this is not a warning)") {
 		t.Fatalf("unknown: %d\n%s", code, so)
 	}
 	code, _, _ = do(t, f, "", "", "check", tmpFile(t, ""), "--allow-unknown")
