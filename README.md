@@ -56,6 +56,10 @@ No telemetry, no update check, no config file, nothing stored on disk. The only 
 
 Unsigned for now. Windows SmartScreen or macOS Gatekeeper may warn on first run (on a Mac, right-click, Open, or `xattr -d com.apple.quarantine <file>`). Each release has a `SHA256SUMS` file; compare it with the file you downloaded (`sha256sum -c SHA256SUMS`, or `shasum -a 256`).
 
+## Used by
+
+- [fileion/check-action](https://github.com/fileion/check-action), a GitHub Action that runs `fileion check` on your build files. Available on GitHub.
+
 ## Build
 
 `./build.sh [version]` builds six files (windows, darwin, linux; amd64, arm64) into `dist/` with `-trimpath` and no build ID, so the same source and Go version give the same bytes. CI (`.github/workflows/build.yml`) runs `gofmt`, `go vet` and `go test` (Linux and Windows), builds twice and compares, and checks the file types. Standard library only; no secrets.
