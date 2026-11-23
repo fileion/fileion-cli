@@ -6,6 +6,15 @@ A small command-line program for the Fileion catalogue. It checks a file's SHA-2
 - Reads only the public Fileion API (`https://fileion.com/api/v1`). Free, no key needed (60 requests a minute per IP).
 - MIT licensed, provided as is.
 
+## Install
+
+```
+brew install fileion/tap/fileion           # macOS, Linux (Homebrew)
+scoop bucket add fileion https://github.com/fileion/scoop-bucket && scoop install fileion   # Windows (Scoop)
+```
+
+Or download the file for your system from the [releases](https://github.com/fileion/fileion-cli/releases) and compare it with `SHA256SUMS`. The brew and scoop entries point at those same release files and carry their SHA-256.
+
 ## Usage
 
 ```

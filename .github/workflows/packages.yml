@@ -1,0 +1,41 @@
+# When a release is published: write the Homebrew formula and the Scoop manifest from that release's own SHA256SUMS and push
+# them to fileion/homebrew-tap and fileion/scoop-bucket. Nothing is rebuilt: the files and hashes are the release's.
+# Needs the repository secret PACKAGES_TOKEN: a fine-grained token with Contents: read and write on those two repositories only.
+name: packages
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Render from the published SHA256SUMS
+        run: |
+          curl -fsSL -o SHA256SUMS "https://github.com/fileion/fileion-cli/releases/download/$TAG/SHA256SUMS"
+          sh packaging/render.sh "$TAG" SHA256SUMS fileion.rb fileion.json
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: fileion/homebrew-tap
+          token: ${{ secrets.PACKAGES_TOKEN }}
+          path: tap
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: fileion/scoop-bucket
+          token: ${{ secrets.PACKAGES_TOKEN }}
+          path: bucket
+      - name: Commit and push both
+        run: |
+          mkdir -p tap/Formula bucket/bucket
+          cp fileion.rb tap/Formula/fileion.rb
+          cp fileion.json bucket/bucket/fileion.json
+          for d in tap bucket; do
+            git -C "$d" config user.name "fileion-release"
+            git -C "$d" config user.email "noreply@fileion.com"
+            git -C "$d" add -A
+            git -C "$d" diff --cached --quiet || { git -C "$d" commit -m "fileion $TAG" && git -C "$d" push; }
+          done
