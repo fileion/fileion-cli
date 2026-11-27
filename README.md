@@ -71,4 +71,4 @@ Unsigned for now. Windows SmartScreen or macOS Gatekeeper may warn on first run 
 
 ## Build
 
-`./build.sh [version]` builds six files (windows, darwin, linux; amd64, arm64) into `dist/` with `-trimpath` and no build ID, so the same source and Go version give the same bytes. CI (`.github/workflows/build.yml`) runs `gofmt`, `go vet` and `go test` (Linux and Windows), builds twice and compares, and checks the file types. Standard library only; no secrets.
+`./build.sh [version]` builds six files (windows, darwin, linux; amd64, arm64) into `dist/` with `-trimpath` and no build ID, so the same source and Go version give the same bytes. CI (`.github/workflows/build.yml`) runs `gofmt`, `go vet` and `go test` (Linux), builds twice and compares, and checks the file types. Standard library only; no secrets.
